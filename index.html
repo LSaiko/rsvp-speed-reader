@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<!--
+  RSVP Speed Reader — Portfolio Showcase Page
+  Hosted at: https://your-username.github.io/rsvp-speed-reader
+  This page is the "cover" for the GitHub repo. Hiring managers land here.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RSVP Speed Reader — Portfolio</title>
+  <meta name="description" content="A browser-based speed reading tool using the Optimal Recognition Point algorithm. Zero dependencies, single-file architecture, supports PDF/DOCX/TXT.">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #f4f0e8;
+      --ink:      #1a1612;
+      --ink2:     #4a4540;
+      --ink3:     #8a8078;
+      --accent:   #c8392b;
+      --accent2:  #2563eb;
+      --surface:  #ede9e0;
+      --border:   #d4cfc5;
+      --code-bg:  #1a1612;
+      --code-text:#e8e4dc;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Lora', Georgia, serif;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── HERO ──────────────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-left {
+      padding: 4rem 3rem 4rem 5vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--ink3);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .hero-eyebrow::before {
+      content: '';
+      display: block;
+      width: 2rem;
+      height: 1px;
+      background: var(--ink3);
+    }
+
+    .hero-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(3.5rem, 7vw, 6rem);
+      font-weight: 800;
+      line-height: 0.95;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+      margin-bottom: 1.5rem;
+    }
+    .hero-title em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero-description {
+      font-size: 1.05rem;
+      color: var(--ink2);
+      max-width: 420px;
+      line-height: 1.75;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 0.85rem 1.75rem;
+      border-radius: 4px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--ink);
+      color: var(--bg);
+    }
+    .btn-primary:hover { background: var(--accent); transform: translateY(-2px); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--ink);
+      border: 1.5px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--ink); transform: translateY(-2px); }
+
+    .hero-right {
+      background: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Animated word display mock-up in the hero */
+    .hero-demo {
+      width: 100%;
+      max-width: 400px;
+      color: #e8e4dc;
+      font-family: 'DM Mono', monospace;
+    }
+    .demo-bar {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #5a5650;
+      border-bottom: 1px solid #2a2820;
+      padding-bottom: 0.75rem;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    .demo-dot {
+      display: inline-block;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #e8c547;
+      margin-right: 0.4rem;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+    .demo-word {
+      text-align: center;
+      padding: 2.5rem 0;
+      font-size: 2.8rem;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .demo-word::before {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 1px;
+      background: rgba(232,197,71,0.15);
+      left: 50%;
+    }
+    .demo-focal { color: #e8c547; position: relative; }
+    .demo-focal::after {
+      content: '';
+      position: absolute;
+      bottom: -6px; left: 50%;
+      transform: translateX(-50%);
+      width: 4px; height: 4px;
+      background: #e8c547;
+      border-radius: 50%;
+    }
+    .demo-context {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      padding-top: 1.5rem;
+      border-top: 1px solid #2a2820;
+      flex-wrap: wrap;
+      overflow: hidden;
+    }
+    .demo-ctx-word {
+      font-size: 0.7rem;
+      color: #3a3830;
+      transition: all 0.3s;
+    }
+    .demo-ctx-word.hi { color: #8a8470; }
+
+    .demo-controls {
+      margin-top: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .demo-slider-track {
+      flex: 1;
+      height: 3px;
+      background: #2a2820;
+      border-radius: 2px;
+      position: relative;
+    }
+    .demo-slider-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 60%;
+      background: #e8c547;
+      border-radius: 2px;
+    }
+    .demo-slider-thumb {
+      position: absolute;
+      top: 50%; left: 60%;
+      transform: translate(-50%, -50%);
+      width: 12px; height: 12px;
+      background: #e8c547;
+      border-radius: 50%;
+    }
+    .demo-wpm { font-size: 0.65rem; color: #e8c547; letter-spacing: 0.1em; white-space: nowrap; }
+
+    /* ── NAV ──────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 1rem 5vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(244,240,232,0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s;
+    }
+    nav.scrolled { border-bottom-color: var(--border); }
+    .nav-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--accent); }
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink3);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--ink); }
+
+    /* ── SECTIONS ─────────────────────────────────────────────── */
+    section {
+      padding: 6rem 5vw;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--ink3);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .section-label::before {
+      content: '';
+      display: block;
+      width: 1.5rem;
+      height: 1px;
+      background: var(--ink3);
+    }
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── HOW IT WORKS ─────────────────────────────────────────── */
+    #how {
+      background: var(--surface);
+      max-width: 100%;
+      padding: 6rem 5vw;
+    }
+    #how .inner { max-width: 1200px; margin: 0 auto; }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+
+    .step-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .step-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.08); }
+
+    .step-number {
+      font-family: 'Syne', sans-serif;
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--border);
+      line-height: 1;
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+    }
+
+    .step-icon { font-size: 1.5rem; margin-bottom: 1rem; }
+    .step-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--ink);
+    }
+    .step-desc { font-size: 0.9rem; color: var(--ink2); line-height: 1.65; }
+
+    /* ── ORP VISUALIZATION ─────────────────────────────────────── */
+    #orp {
+      border-top: 1px solid var(--border);
+      padding-top: 6rem;
+    }
+
+    .orp-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 2rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+    }
+    .orp-table th {
+      text-align: left;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink3);
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .orp-table td {
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--ink2);
+    }
+    .orp-table tr:last-child td { border-bottom: none; }
+    .orp-word { font-size: 1rem; letter-spacing: 0.06em; }
+    .orp-focal { color: var(--accent); font-weight: 500; }
+
+    /* ── SKILLS ───────────────────────────────────────────────── */
+    #skills {
+      background: var(--ink);
+      max-width: 100%;
+      padding: 6rem 5vw;
+    }
+    #skills .inner { max-width: 1200px; margin: 0 auto; }
+    #skills .section-label { color: #5a5650; }
+    #skills .section-label::before { background: #5a5650; }
+    #skills .section-title { color: #e8e4dc; }
+
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      margin-top: 3rem;
+    }
+
+    .skill-card {
+      background: #23211e;
+      border: 1px solid #2a2820;
+      border-radius: 10px;
+      padding: 1.75rem;
+      transition: border-color 0.2s;
+    }
+    .skill-card:hover { border-color: #e8c547; }
+    .skill-category {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #e8c547;
+      margin-bottom: 0.75rem;
+    }
+    .skill-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #e8e4dc;
+      margin-bottom: 0.5rem;
+    }
+    .skill-desc { font-size: 0.85rem; color: #6a6860; line-height: 1.65; font-family: 'Lora', serif; }
+    .skill-tag-row {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .skill-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      color: #4a4840;
+      border: 1px solid #2a2820;
+      border-radius: 3px;
+      padding: 0.2rem 0.5rem;
+    }
+
+    /* ── CODE WALKTHROUGH ─────────────────────────────────────── */
+    #code { border-top: 1px solid var(--border); padding-top: 6rem; }
+
+    .code-block-wrap {
+      margin: 2rem 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .code-header {
+      background: #23211e;
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .code-filename {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      color: #8a8470;
+      letter-spacing: 0.1em;
+    }
+    .code-lang {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      color: #4a4840;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.75;
+      padding: 1.5rem 1.5rem;
+      overflow-x: auto;
+      margin: 0;
+    }
+    .token-comment  { color: #5a6060; font-style: italic; }
+    .token-keyword  { color: #c8a060; }
+    .token-fn       { color: #80c0a0; }
+    .token-string   { color: #a0c080; }
+    .token-number   { color: #c080c0; }
+    .token-const    { color: #e8d8b0; }
+
+    .code-annotation {
+      background: rgba(232,197,71,0.06);
+      border-left: 3px solid #e8c547;
+      padding: 1rem 1.5rem;
+      font-size: 0.88rem;
+      color: var(--ink2);
+      font-family: 'Lora', serif;
+      line-height: 1.7;
+    }
+    .code-annotation strong { color: var(--ink); font-family: 'Syne', sans-serif; }
+
+    /* ── DOWNLOAD ─────────────────────────────────────────────── */
+    #download { border-top: 1px solid var(--border); }
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2.5rem;
+    }
+    .download-card {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 1.75rem;
+      text-decoration: none;
+      color: var(--ink);
+      transition: all 0.2s;
+      display: block;
+    }
+    .download-card:hover { border-color: var(--ink); transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+    .download-icon { font-size: 1.75rem; margin-bottom: 1rem; }
+    .download-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 0.4rem; }
+    .download-desc { font-size: 0.85rem; color: var(--ink2); line-height: 1.6; }
+    .download-size { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--ink3); letter-spacing: 0.1em; margin-top: 0.75rem; }
+
+    /* ── FOOTER ───────────────────────────────────────────────── */
+    footer {
+      padding: 3rem 5vw;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    footer p { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--ink3); letter-spacing: 0.1em; }
+    footer a { color: var(--ink2); text-decoration: none; }
+    footer a:hover { color: var(--ink); }
+
+    /* ── RESPONSIVE ───────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .hero { grid-template-columns: 1fr; }
+      .hero-right { min-height: 280px; padding: 2rem; }
+      .hero-left { padding: 8rem 5vw 3rem; }
+      .demo-word { font-size: 2rem; }
+      nav { padding: 1rem; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAVIGATION ──────────────────────────────────────────── -->
+  <nav id="mainNav">
+    <a href="#" class="nav-logo">RSVP<span>.</span></a>
+    <ul class="nav-links">
+      <li><a href="#how">How it Works</a></li>
+      <li><a href="#skills">Skills</a></li>
+      <li><a href="#code">Code</a></li>
+      <li><a href="#download">Download</a></li>
+      <li><a href="https://github.com/your-username/rsvp-speed-reader" target="_blank">GitHub ↗</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── HERO ────────────────────────────────────────────────── -->
+  <div class="hero">
+    <div class="hero-left">
+      <div class="hero-eyebrow">Portfolio Project · Vanilla JS · Zero Dependencies</div>
+      <h1 class="hero-title">Read <em>faster.</em><br>Retain more.</h1>
+      <p class="hero-description">
+        A browser-based speed reading tool that uses the <strong>Optimal Recognition Point</strong> algorithm to train your eyes — one word at a time, at precisely the speed you set.
+      </p>
+      <div class="hero-cta">
+        <a href="speed-reader.html" class="btn btn-primary">▶ Open App</a>
+        <a href="https://github.com/your-username/rsvp-speed-reader" class="btn btn-secondary" target="_blank">View on GitHub ↗</a>
+      </div>
+    </div>
+
+    <div class="hero-right">
+      <div class="hero-demo">
+        <div class="demo-bar">
+          <span><span class="demo-dot"></span>playing</span>
+          <span id="demoProgress">142 / 3,847</span>
+        </div>
+        <!-- Animated word display: cycles through sample words via JS -->
+        <div class="demo-word" id="demoWord">
+          <span>con</span><span class="demo-focal">C</span><span>ept</span>
+        </div>
+        <div class="demo-context" id="demoCtx">
+          <span class="demo-ctx-word">reading</span>
+          <span class="demo-ctx-word">quickly</span>
+          <span class="demo-ctx-word">through</span>
+          <span class="demo-ctx-word hi">concept</span>
+          <span class="demo-ctx-word">allows</span>
+          <span class="demo-ctx-word">your</span>
+          <span class="demo-ctx-word">brain</span>
+        </div>
+        <div class="demo-controls">
+          <div class="demo-slider-track">
+            <div class="demo-slider-fill"></div>
+            <div class="demo-slider-thumb"></div>
+          </div>
+          <span class="demo-wpm">300 wpm</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HOW IT WORKS ─────────────────────────────────────────── -->
+  <div id="how">
+    <div class="inner">
+      <div class="section-label">Technique</div>
+      <h2 class="section-title">How RSVP works</h2>
+      <p style="max-width:560px;color:var(--ink2);font-size:1rem;line-height:1.8">
+        Traditional reading is slowed by saccades — the back-and-forth eye jumps that scan across a line of text. RSVP eliminates them entirely.
+      </p>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-number">01</div>
+          <div class="step-icon">📄</div>
+          <div class="step-title">Parse your document</div>
+          <div class="step-desc">Upload a PDF, DOCX, TXT, or Markdown file. The parser extracts clean text using PDF.js and Mammoth.js — entirely client-side, nothing leaves your browser.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-number">02</div>
+          <div class="step-icon">🎯</div>
+          <div class="step-title">ORP is calculated</div>
+          <div class="step-desc">For each word, the Optimal Recognition Point is computed. This is the single letter your eyes fixate on to decode the whole word fastest — position varies with word length.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-number">03</div>
+          <div class="step-icon">⚡</div>
+          <div class="step-title">Words flash, one at a time</div>
+          <div class="step-desc">Words display sequentially at your chosen WPM. The focal letter is highlighted in gold. A context strip keeps you spatially oriented as you read.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-number">04</div>
+          <div class="step-icon">📈</div>
+          <div class="step-title">Speed up gradually</div>
+          <div class="step-desc">Average reader: 200–300 WPM. With practice, 500–700 WPM is achievable with full comprehension. Start slow, then push your ceiling over time.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ORP TABLE ─────────────────────────────────────────────── -->
+  <section id="orp">
+    <div class="section-label">Algorithm</div>
+    <h2 class="section-title">The ORP lookup table</h2>
+    <p style="max-width:540px;color:var(--ink2);font-size:0.95rem;line-height:1.8;margin-bottom:1rem">
+      The focal position is mapped from word length to character index. Punctuation is stripped before measurement so <em>"running,"</em> is treated as 7 characters, not 8.
+    </p>
+    <table class="orp-table">
+      <thead>
+        <tr>
+          <th>Word Length</th>
+          <th>Focal Position</th>
+          <th>Example</th>
+          <th>Highlighted</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1–2 chars</td>
+          <td>Position 0 (1st letter)</td>
+          <td class="orp-word">it</td>
+          <td class="orp-word"><span class="orp-focal">i</span>t</td>
+        </tr>
+        <tr>
+          <td>3–5 chars</td>
+          <td>Position 1 (2nd letter)</td>
+          <td class="orp-word">read</td>
+          <td class="orp-word">r<span class="orp-focal">e</span>ad</td>
+        </tr>
+        <tr>
+          <td>6–9 chars</td>
+          <td>Position 2 (3rd letter)</td>
+          <td class="orp-word">faster</td>
+          <td class="orp-word">fa<span class="orp-focal">s</span>ter</td>
+        </tr>
+        <tr>
+          <td>10–13 chars</td>
+          <td>Position 3 (4th letter)</td>
+          <td class="orp-word">understand</td>
+          <td class="orp-word">und<span class="orp-focal">e</span>rstand</td>
+        </tr>
+        <tr>
+          <td>14+ chars</td>
+          <td>Position 4 (5th letter)</td>
+          <td class="orp-word">implementation</td>
+          <td class="orp-word">impl<span class="orp-focal">e</span>mentation</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── SKILLS ─────────────────────────────────────────────────── -->
+  <div id="skills">
+    <div class="inner">
+      <div class="section-label">Engineering</div>
+      <h2 class="section-title">Skills demonstrated</h2>
+      <p style="max-width:540px;color:#6a6860;font-size:0.95rem;line-height:1.8;font-family:'Lora',serif">
+        Every engineering decision in this project has a deliberate rationale. Here's what's under the hood.
+      </p>
+      <div class="skills-grid">
+
+        <div class="skill-card">
+          <div class="skill-category">Algorithms</div>
+          <div class="skill-title">ORP Positional Mapping</div>
+          <div class="skill-desc">Custom lookup algorithm that maps semantic word length (punctuation-stripped) to an optimal focal character index. Handles edge cases like contractions and hyphenated words.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">string processing</span>
+            <span class="skill-tag">regex</span>
+            <span class="skill-tag">lookup tables</span>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <div class="skill-category">Scheduling</div>
+          <div class="skill-title">Recursive setTimeout Loop</div>
+          <div class="skill-desc">Chose recursive setTimeout over setInterval to prevent callback stacking. Dynamic delay recalculation on each word enables live WPM changes without restarting playback.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">async JS</span>
+            <span class="skill-tag">event loop</span>
+            <span class="skill-tag">timing API</span>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <div class="skill-category">Browser APIs</div>
+          <div class="skill-title">File Parsing Pipeline</div>
+          <div class="skill-desc">Routes .pdf files through PDF.js (ArrayBuffer → page text content items), .docx through Mammoth.js, and plain text through the native File.text() API.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">FileReader API</span>
+            <span class="skill-tag">ArrayBuffer</span>
+            <span class="skill-tag">async/await</span>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <div class="skill-category">DOM</div>
+          <div class="skill-title">High-Frequency Rendering</div>
+          <div class="skill-desc">Single innerHTML write per word (not N individual insertions). requestAnimationFrame defers focal guide positioning until after paint for accurate getBoundingClientRect measurements.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">DOM manipulation</span>
+            <span class="skill-tag">rAF</span>
+            <span class="skill-tag">layout thrashing</span>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <div class="skill-category">CSS</div>
+          <div class="skill-title">Animation Reflow Trick</div>
+          <div class="skill-desc">Reading <code style="font-size:0.8em;background:rgba(255,255,255,0.1);padding:0.1em 0.3em;border-radius:2px">void el.offsetWidth</code> forces a synchronous browser reflow, allowing CSS keyframe animations to replay on each word instead of running only once.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">CSS animations</span>
+            <span class="skill-tag">reflow</span>
+            <span class="skill-tag">custom properties</span>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <div class="skill-category">Architecture</div>
+          <div class="skill-title">Zero-Dependency Design</div>
+          <div class="skill-desc">Core read/display loop has zero runtime dependencies. PDF.js and Mammoth are optional CDN enhancers — the app degrades gracefully to TXT mode if they fail to load.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">graceful degradation</span>
+            <span class="skill-tag">portability</span>
+            <span class="skill-tag">CDN strategy</span>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <div class="skill-category">UX Engineering</div>
+          <div class="skill-title">Keyboard-First Navigation</div>
+          <div class="skill-desc">Full keyboard control with an active-element guard that prevents shortcut capture during text input. Space, arrows, and modifier keys all handled without a UI framework.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">accessibility</span>
+            <span class="skill-tag">KeyboardEvent</span>
+            <span class="skill-tag">event delegation</span>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <div class="skill-category">CSS Architecture</div>
+          <div class="skill-title">Design Token System</div>
+          <div class="skill-desc">All colors reference CSS custom properties — zero hardcoded hex in component styles. Fluid font scaling via clamp(). Pure-CSS toggle switches with no JS for appearance.</div>
+          <div class="skill-tag-row">
+            <span class="skill-tag">CSS variables</span>
+            <span class="skill-tag">clamp()</span>
+            <span class="skill-tag">sibling selectors</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CODE WALKTHROUGH ─────────────────────────────────────── -->
+  <section id="code">
+    <div class="section-label">Code</div>
+    <h2 class="section-title">Annotated walkthrough</h2>
+    <p style="max-width:560px;color:var(--ink2);font-size:0.95rem;line-height:1.8">
+      Three core functions that make the app work. Every line has a reason.
+    </p>
+
+    <!-- ORP Algorithm -->
+    <div class="code-block-wrap">
+      <div class="code-header">
+        <span class="code-filename">speed-reader.html</span>
+        <span class="code-lang">JavaScript</span>
+      </div>
+      <pre><span class="token-comment">/*
+ * ORP ALGORITHM
+ * Maps word length → focal letter index (0-based, alpha chars only).
+ * Stripping punctuation first ensures "running," is measured as 7,
+ * not 8 — so the focal point doesn't shift right for a comma.
+ */</span>
+<span class="token-keyword">function</span> <span class="token-fn">getFocalIndex</span>(word) {
+  <span class="token-keyword">const</span> <span class="token-const">clean</span> = word.<span class="token-fn">replace</span>(<span class="token-string">/[^a-zA-Z0-9]/g</span>, <span class="token-string">''</span>);
+  <span class="token-keyword">const</span> <span class="token-const">len</span>   = clean.length;
+
+  <span class="token-keyword">if</span> (len &lt;= <span class="token-number">1</span>)  <span class="token-keyword">return</span> <span class="token-number">0</span>;
+  <span class="token-keyword">if</span> (len &lt;= <span class="token-number">5</span>)  <span class="token-keyword">return</span> <span class="token-number">1</span>;
+  <span class="token-keyword">if</span> (len &lt;= <span class="token-number">9</span>)  <span class="token-keyword">return</span> <span class="token-number">2</span>;
+  <span class="token-keyword">if</span> (len &lt;= <span class="token-number">13</span>) <span class="token-keyword">return</span> <span class="token-number">3</span>;
+  <span class="token-keyword">return</span> <span class="token-number">4</span>;
+}</pre>
+    </div>
+    <div class="code-annotation">
+      <strong>Why these breakpoints?</strong> They derive from the Spritz patent (US20140270580) and eye-tracking research on saccadic fixation. The ORP sits at ~30% into the word for short words, drifting toward ~25% for long words — because peripheral vision covers more letters as the fixation point moves right.
+    </div>
+
+    <!-- Scheduler -->
+    <div class="code-block-wrap" style="margin-top:2.5rem">
+      <div class="code-header">
+        <span class="code-filename">speed-reader.html</span>
+        <span class="code-lang">JavaScript</span>
+      </div>
+      <pre><span class="token-comment">/*
+ * PLAYBACK SCHEDULER
+ * Recursive setTimeout (not setInterval) ensures the next word is
+ * scheduled AFTER the current render completes — never stacks up.
+ */</span>
+<span class="token-keyword">function</span> <span class="token-fn">showWord</span>() {
+  <span class="token-keyword">if</span> (idx >= words.length) { <span class="token-fn">stopPlayback</span>(); <span class="token-keyword">return</span>; }
+
+  <span class="token-fn">renderWord</span>(words[idx]);    <span class="token-comment">// Paint the word</span>
+  <span class="token-fn">renderContext</span>();           <span class="token-comment">// Update surrounding words strip</span>
+  <span class="token-fn">updateProgress</span>();          <span class="token-comment">// Progress bar + ETA</span>
+
+  <span class="token-keyword">const</span> <span class="token-const">delay</span> = <span class="token-fn">getDelay</span>(words[idx]);
+  idx++;   <span class="token-comment">// Advance BEFORE scheduling so pause lands at next word</span>
+  timer = <span class="token-fn">setTimeout</span>(showWord, delay);
+}
+
+<span class="token-comment">// Hot WPM change: cancel in-flight timer, reschedule at new rate</span>
+wpmSlider.<span class="token-fn">addEventListener</span>(<span class="token-string">'input'</span>, () => {
+  wpm = <span class="token-fn">parseInt</span>(wpmSlider.value);
+  <span class="token-keyword">if</span> (playing) {
+    <span class="token-fn">clearTimeout</span>(timer);
+    timer = <span class="token-fn">setTimeout</span>(showWord, <span class="token-number">60000</span> / wpm);
+  }
+});</pre>
+    </div>
+    <div class="code-annotation">
+      <strong>The idx-before-schedule pattern:</strong> Incrementing <code>idx</code> before calling setTimeout means if the user presses Pause at any point, the cleared timer leaves <code>idx</code> pointing to the <em>next</em> unshown word — so Resume continues correctly without repeating or skipping a word.
+    </div>
+
+    <!-- rAF trick -->
+    <div class="code-block-wrap" style="margin-top:2.5rem">
+      <div class="code-header">
+        <span class="code-filename">speed-reader.html</span>
+        <span class="code-lang">JavaScript</span>
+      </div>
+      <pre><span class="token-comment">/*
+ * ANIMATION REFLOW TRICK
+ * CSS keyframe animations only replay when the element re-enters
+ * the animated state. Removing + re-adding the class in the same
+ * JS microtask does nothing — the browser batches style changes.
+ *
+ * Reading offsetWidth forces a synchronous layout flush, committing
+ * the class removal before we re-add it → fresh animation every word.
+ */</span>
+wordDisplay.classList.<span class="token-fn">remove</span>(<span class="token-string">'flash'</span>);
+<span class="token-keyword">void</span> wordDisplay.offsetWidth;   <span class="token-comment">// ← intentional reflow</span>
+wordDisplay.classList.<span class="token-fn">add</span>(<span class="token-string">'flash'</span>);
+
+<span class="token-comment">/*
+ * FOCAL GUIDE POSITIONING
+ * getBoundingClientRect must run after the browser paints the new word.
+ * requestAnimationFrame defers until the next paint frame — without
+ * this, measurements would be stale (from the previous word).
+ */</span>
+<span class="token-fn">requestAnimationFrame</span>(() => {
+  <span class="token-keyword">const</span> <span class="token-const">focal</span>     = wordDisplay.<span class="token-fn">querySelector</span>(<span class="token-string">'.focal'</span>);
+  <span class="token-keyword">const</span> <span class="token-const">stageRect</span> = wordDisplay.parentElement.<span class="token-fn">getBoundingClientRect</span>();
+  <span class="token-keyword">const</span> <span class="token-const">focalRect</span> = focal.<span class="token-fn">getBoundingClientRect</span>();
+  <span class="token-keyword">const</span> <span class="token-const">relX</span>      = focalRect.left - stageRect.left + focalRect.width / <span class="token-number">2</span>;
+  focalGuide.style.left = relX + <span class="token-string">'px'</span>;
+});</pre>
+    </div>
+    <div class="code-annotation">
+      <strong>Why not just use CSS <code>left: 50%</code>?</strong> Words have different lengths and the focal letter is <em>not</em> centered — it's at a calculated position that shifts per word. The guide line must track the actual pixel position of a specific letter, which requires measuring the rendered DOM after paint.
+    </div>
+  </section>
+
+  <!-- ── DOWNLOAD ─────────────────────────────────────────────── -->
+  <section id="download" style="border-top:1px solid var(--border)">
+    <div class="section-label">Downloads</div>
+    <h2 class="section-title">Get the files</h2>
+    <p style="max-width:500px;color:var(--ink2);font-size:0.95rem;line-height:1.8">
+      Everything you need is in the GitHub repository. The app itself is a single HTML file.
+    </p>
+    <div class="download-grid">
+      <a href="speed-reader.html" class="download-card" download>
+        <div class="download-icon">⚡</div>
+        <div class="download-title">speed-reader.html</div>
+        <div class="download-desc">The complete application. Open in any modern browser — no server, no install.</div>
+        <div class="download-size">Single file · ~25 KB</div>
+      </a>
+      <a href="README.md" class="download-card" download>
+        <div class="download-icon">📖</div>
+        <div class="download-title">README.md</div>
+        <div class="download-desc">Full project documentation, quick-start guide, feature list, and architecture overview.</div>
+        <div class="download-size">Markdown · ~8 KB</div>
+      </a>
+      <a href="ARCHITECTURE.md" class="download-card" download>
+        <div class="download-icon">🏗️</div>
+        <div class="download-title">ARCHITECTURE.md</div>
+        <div class="download-desc">Annotated deep-dive into every engineering decision with code excerpts and trade-off analysis.</div>
+        <div class="download-size">Markdown · ~12 KB</div>
+      </a>
+      <a href="https://github.com/your-username/rsvp-speed-reader/archive/refs/heads/main.zip" class="download-card" target="_blank">
+        <div class="download-icon">📦</div>
+        <div class="download-title">Full Repository</div>
+        <div class="download-desc">Clone or download the complete repo including GitHub Actions deploy workflow.</div>
+        <div class="download-size">GitHub · ZIP or git clone</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ─────────────────────────────────────────────────── -->
+  <footer>
+    <p>RSVP Speed Reader · MIT License · <a href="https://github.com/your-username/rsvp-speed-reader" target="_blank">github.com/your-username/rsvp-speed-reader</a></p>
+    <p>Built with Vanilla JS · PDF.js · Mammoth.js</p>
+  </footer>
+
+  <script>
+    // Nav scroll effect
+    const nav = document.getElementById('mainNav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // Hero demo animation — cycles through sample words
+    const demoWords = [
+      { word: 'reading',     focal: 2 },
+      { word: 'fast',        focal: 1 },
+      { word: 'trains',      focal: 2 },
+      { word: 'your',        focal: 1 },
+      { word: 'brain',       focal: 2 },
+      { word: 'to',          focal: 0 },
+      { word: 'process',     focal: 2 },
+      { word: 'information', focal: 3 },
+      { word: 'at',          focal: 0 },
+      { word: 'speed',       focal: 2 },
+    ];
+
+    const ctxWords = [
+      ['training', 'your', 'brain', 'to', 'process', 'information', 'faster'],
+      ['fast', 'reading', 'trains', 'your', 'brain', 'quickly', 'processes'],
+      ['the', 'rsvp', 'method', 'trains', 'your', 'reading', 'ability'],
+      ['speed', 'reading', 'fast', 'trains', 'your', 'brain', 'effectively'],
+    ];
+
+    let demoIdx = 0;
+    let ctxIdx = 0;
+    const demoWordEl = document.getElementById('demoWord');
+    const demoCtxEl  = document.getElementById('demoCtx');
+    const demoProgressEl = document.getElementById('demoProgress');
+
+    function animateDemoWord() {
+      const { word, focal } = demoWords[demoIdx % demoWords.length];
+      let html = '';
+      for (let i = 0; i < word.length; i++) {
+        if (i === focal) {
+          html += `<span class="demo-focal">${word[i].toUpperCase()}</span>`;
+        } else {
+          html += `<span>${word[i]}</span>`;
+        }
+      }
+      demoWordEl.innerHTML = html;
+
+      // Update context strip
+      const ctx = ctxWords[Math.floor(demoIdx / demoWords.length) % ctxWords.length];
+      const currentCtxIdx = demoIdx % ctx.length;
+      demoCtxEl.innerHTML = ctx.map((w, i) =>
+        `<span class="demo-ctx-word ${i === currentCtxIdx ? 'hi' : ''}">${w}</span>`
+      ).join('');
+
+      // Update progress
+      const total = 3847;
+      const current = 142 + (demoIdx * 7);
+      demoProgressEl.textContent = `${Math.min(current, total).toLocaleString()} / ${total.toLocaleString()}`;
+
+      demoIdx++;
+      setTimeout(animateDemoWord, 400);
+    }
+    animateDemoWord();
+  </script>
+</body>
+</html>

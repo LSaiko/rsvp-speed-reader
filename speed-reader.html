@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║  RSVP Speed Reader                                                       ║
+  ║  Rapid Serial Visual Presentation with Optimal Recognition Point (ORP)  ║
+  ║                                                                          ║
+  ║  Architecture: Single-file, zero build-step, zero runtime dependencies  ║
+  ║  File parsing: PDF.js (CDN) + Mammoth.js (CDN) for binary formats       ║
+  ║  Technique:    ORP algorithm + recursive setTimeout scheduler            ║
+  ║                                                                          ║
+  ║  See ARCHITECTURE.md for full technical deep-dive                       ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RSVP Speed Reader</title>
+
+  <!--
+    External parsers loaded from cdnjs (pinned versions for reproducibility).
+    These are only used when processing .pdf or .docx files — the core
+    read/display loop has zero dependencies and works fully offline.
+  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <!--
+    Google Fonts: three typefaces with distinct roles.
+    - Bebas Neue:  Display headers — high-impact, narrow, editorial
+    - DM Mono:     Labels, code-like UI chrome — mechanical precision
+    - DM Sans:     Body text — readable without competing with display font
+  -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap');
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       DESIGN TOKENS
+       All colors reference custom properties — zero hardcoded hex
+       values in component styles. Changing the theme = editing here.
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;   /* Page background — near-black with blue cast */
+      --surface:   #111118;   /* Card / panel background */
+      --surface2:  #1a1a24;   /* Elevated surface (hover states) */
+      --border:    #2a2a38;   /* Borders and dividers */
+      --accent:    #e8c547;   /* Primary actions — warm gold */
+      --accent2:   #ff6b6b;   /* Destructive actions — coral red */
+      --text:      #e8e8f0;   /* Body text — slightly blue-white */
+      --muted:     #5a5a72;   /* Labels, secondary copy */
+      --highlight: #e8c547;   /* Focal letter highlight (same as accent) */
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      overflow-x: hidden;
+    }
+
+    /* Subtle grid overlay: creates depth without competing with content */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(232,197,71,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,197,71,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;  /* Never intercepts clicks */
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;            /* Renders above ::before grid */
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       HEADER
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.8rem;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      line-height: 1;
+    }
+    header span {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       UPLOAD ZONE
+       Handles both click-to-browse and drag-and-drop via JS DragEvent API
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .upload-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(232,197,71,0.04);
+    }
+    /* Radial glow appears on hover via pseudo-element opacity toggle */
+    .upload-zone::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(232,197,71,0.06) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .upload-zone:hover::after { opacity: 1; }
+
+    /* The real <input> is hidden; the zone div acts as its visible proxy */
+    .upload-zone input { display: none; }
+    .upload-icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
+    .upload-zone p { font-size: 0.9rem; color: var(--muted); line-height: 1.7; }
+    .upload-zone strong { color: var(--accent); font-weight: 500; }
+    .file-types {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.5rem;
+      text-transform: uppercase;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       TEXT INPUT
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .text-area-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+    label.section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    textarea {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      padding: 1rem 1.2rem;
+      resize: vertical;
+      min-height: 120px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: rgba(232,197,71,0.4); }
+    textarea::placeholder { color: var(--muted); }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       CONTROLS PANEL
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .controls {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+    .wpm-section { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 200px; }
+    .wpm-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .wpm-header label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .wpm-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.6rem;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+    .wpm-unit { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); margin-left: 0.2rem; }
+
+    /* Custom range slider — hides browser default, applies brand style */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    /* Progress bar — driven by JS style.width changes */
+    .progress-info { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); display: flex; align-items: center; gap: 0.5rem; }
+    .progress-bar-wrap { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.1s linear; width: 0%; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       BUTTONS — three semantic variants
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    button {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 0.65rem 1.4rem;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: #0a0a0f; font-weight: 500; }
+    .btn-primary:hover { background: #f0d060; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+    .btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-danger { background: transparent; color: var(--accent2); border: 1px solid rgba(255,107,107,0.3); }
+    .btn-danger:hover { background: rgba(255,107,107,0.1); }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       READER DISPLAY — the main stage
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .reader-display {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color 0.3s;
+      position: relative;
+    }
+    .reader-display.active { border-color: rgba(232,197,71,0.3); }
+
+    .reader-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.2);
+    }
+    .reader-top-bar span { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+
+    /* Status indicator dot — CSS animation triggered by JS class toggle */
+    .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin-right: 0.4rem; transition: background 0.3s; }
+    .status-dot.playing { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .word-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      padding: 2.5rem 2rem;
+      position: relative;
+    }
+
+    /* Subtle horizontal crosshair at vertical center */
+    .word-stage::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(232,197,71,0.06), transparent);
+      pointer-events: none;
+    }
+
+    /*
+      Word display: uses clamp() for fluid responsive font size.
+      clamp(min, preferred, max) = scales smoothly between breakpoints
+      without media queries.
+    */
+    .word-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: clamp(2.5rem, 6vw, 4rem);
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      position: relative;
+      user-select: none;     /* Prevent text selection during rapid display */
+      min-height: 5rem;
+      transition: opacity 0.05s;
+    }
+
+    /*
+      Flash animation: fade-in + subtle scale on each new word.
+      The JS "reflow trick" (void el.offsetWidth) forces this to
+      replay even when the class is re-added immediately.
+    */
+    .word-display.flash {
+      animation: wordFlash 0.08s ease-out;
+    }
+    @keyframes wordFlash {
+      0%   { opacity: 0; transform: scale(0.97); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .letter { display: inline-block; transition: color 0.05s; }
+
+    /* Focal letter: gold color + dot below to draw the eye */
+    .letter.focal { color: var(--highlight); position: relative; }
+    .letter.focal::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px; height: 4px;
+      background: var(--highlight);
+      border-radius: 50%;
+    }
+
+    /* Vertical guide line: positioned by JS to align with focal letter */
+    .focal-guide {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 1px;
+      background: rgba(232,197,71,0.12);
+      pointer-events: none;
+      transition: left 0.05s;
+    }
+
+    .idle-text { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+    .idle-text strong { color: var(--accent); }
+
+    /* Context strip: scrolling window of surrounding words */
+    .context-strip {
+      padding: 0.75rem 1.5rem;
+      border-top: 1px solid var(--border);
+      background: rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      overflow: hidden;
+      min-height: 2.5rem;
+    }
+    .context-word { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); opacity: 0.5; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
+    .context-word.current { color: var(--text); opacity: 1; font-weight: 500; }
+    .context-word.prev { opacity: 0.35; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       TOGGLE SWITCHES — pure CSS, zero JS for appearance
+       The hidden checkbox drives visual state via the ~ sibling selector
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .options-row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .option-toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    .option-toggle input[type=checkbox] { display: none; }
+    .toggle-track { width: 32px; height: 18px; background: var(--border); border-radius: 9px; position: relative; transition: background 0.2s; }
+    .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: var(--muted); border-radius: 50%; transition: all 0.2s; }
+    .option-toggle input:checked + .toggle-track { background: rgba(232,197,71,0.3); }
+    .option-toggle input:checked + .toggle-track .toggle-thumb { left: 17px; background: var(--accent); }
+    .option-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+    /* Stats row */
+    .stats-row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .stat-box { display: flex; flex-direction: column; gap: 0.15rem; }
+    .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--text); letter-spacing: 0.05em; line-height: 1; }
+    .stat-label { font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+    .divider { width: 1px; height: 36px; background: var(--border); align-self: center; }
+
+    /* Status / feedback bar */
+    .status-bar { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; padding: 0.4rem 0; min-height: 1.5rem; }
+    .status-bar.success { color: #6ee7b7; }
+    .status-bar.error { color: var(--accent2); }
+
+    /* Keyboard hint badges */
+    .kbd { display: inline-block; font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); border: 1px solid var(--border); border-radius: 3px; padding: 0.1rem 0.35rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>RSVP</h1>
+    <span>Rapid Serial Visual Presentation — Speed Reader</span>
+  </header>
+
+  <!-- File upload: hidden <input> triggered by clicking the visible zone div -->
+  <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt,.md,.rtf">
+    <span class="upload-icon">📄</span>
+    <p><strong>Drop a file here</strong> or click to browse</p>
+    <div class="file-types">
+      <span class="tag">PDF</span>
+      <span class="tag">DOCX</span>
+      <span class="tag">TXT</span>
+      <span class="tag">MD</span>
+    </div>
+  </div>
+
+  <!-- Plain text fallback — detects input changes and auto-loads -->
+  <div class="text-area-wrap">
+    <label class="section-label" for="textInput">— or paste text directly</label>
+    <textarea id="textInput" placeholder="Paste any text here and hit Play..."></textarea>
+  </div>
+
+  <!-- User feedback / status messages -->
+  <div class="status-bar" id="statusBar">Ready — load a file or paste text to begin.</div>
+
+  <!-- Main reader stage -->
+  <div class="reader-display" id="readerDisplay">
+    <div class="reader-top-bar">
+      <span>
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusLabel">Idle</span>
+      </span>
+      <span id="progressLabel">0 / 0</span>
+    </div>
+    <div class="word-stage">
+      <!-- Vertical guide: JS positions this to align with focal letter -->
+      <div class="focal-guide" id="focalGuide"></div>
+      <!-- The word display: rebuilt on every word via innerHTML -->
+      <div class="word-display" id="wordDisplay">
+        <span class="idle-text">Press <strong>Play</strong> to begin</span>
+      </div>
+    </div>
+    <!-- Scrolling context window: N words before/after current position -->
+    <div class="context-strip" id="contextStrip"></div>
+  </div>
+
+  <!-- Controls panel -->
+  <div class="controls">
+
+    <!-- WPM slider: range 60–1000, default 300 -->
+    <div class="wpm-section">
+      <div class="wpm-header">
+        <label>Reading Speed</label>
+        <div>
+          <span class="wpm-value" id="wpmDisplay">300</span>
+          <span class="wpm-unit">wpm</span>
+        </div>
+      </div>
+      <input type="range" id="wpmSlider" min="60" max="1000" step="10" value="300">
+    </div>
+
+    <!-- Linear progress bar + ETA countdown -->
+    <div class="progress-info">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <span id="etaLabel">—</span>
+    </div>
+
+    <!-- Stats (hidden until content is loaded) -->
+    <div class="stats-row" id="statsRow" style="display:none">
+      <div class="stat-box">
+        <div class="stat-value" id="wordCountStat">0</div>
+        <div class="stat-label">Words</div>
+      </div>
+      <div class="divider"></div>
+      <div class="stat-box">
+        <div class="stat-value" id="estTimeStat">—</div>
+        <div class="stat-label">Est. Time</div>
+      </div>
+      <div class="divider"></div>
+      <div class="stat-box">
+        <div class="stat-value" id="charCountStat">0</div>
+        <div class="stat-label">Characters</div>
+      </div>
+    </div>
+
+    <!-- Feature toggles: pure CSS appearance, JS reads .checked on demand -->
+    <div class="options-row">
+      <label class="option-toggle">
+        <input type="checkbox" id="optContext" checked>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <span class="option-label">Context Strip</span>
+      </label>
+      <label class="option-toggle">
+        <input type="checkbox" id="optPausePunct" checked>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <span class="option-label">Pause on Punctuation</span>
+      </label>
+      <label class="option-toggle">
+        <input type="checkbox" id="optFlash" checked>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <span class="option-label">Flash Animation</span>
+      </label>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="btn-row">
+      <button class="btn-primary"   id="btnPlay"    disabled>▶ Play</button>
+      <button class="btn-secondary" id="btnPause"   disabled>⏸ Pause</button>
+      <button class="btn-secondary" id="btnRestart" disabled>↺ Restart</button>
+      <button class="btn-danger"    id="btnClear"          >✕ Clear</button>
+    </div>
+
+    <!-- Keyboard shortcut reference -->
+    <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
+      <span style="font-family:'DM Mono',monospace;font-size:0.63rem;color:var(--muted)">
+        <span class="kbd">Space</span> play/pause &nbsp;
+        <span class="kbd">←</span> back &nbsp;
+        <span class="kbd">→</span> skip &nbsp;
+        <span class="kbd">↑↓</span> speed
+      </span>
+    </div>
+
+  </div><!-- /controls -->
+</div><!-- /container -->
+
+<script>
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  SETUP
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *
+ *  Pin PDF.js Web Worker to the same CDN version as the main library.
+ *  Without this, PDF.js tries to load a worker from a default path
+ *  that doesn't exist in our environment.
+ */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  STATE
+ *  Flat module-scope variables — no framework, no reactive proxy needed
+ *  at this scale. All functions read/write these directly.
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+let words   = [];    // Tokenized word array populated by loadText()
+let idx     = 0;     // Read head: index of the next word to display
+let playing = false; // True during active playback
+let timer   = null;  // setTimeout handle — stored so we can clearTimeout()
+let wpm     = 300;   // Words per minute; mirrors the slider value
+
+/*
+ * DOM element cache — look up once at startup, reuse everywhere.
+ * This avoids repeated querySelector calls inside the render loop.
+ */
+const fileInput     = document.getElementById('fileInput');
+const textInput     = document.getElementById('textInput');
+const dropZone      = document.getElementById('dropZone');
+const wordDisplay   = document.getElementById('wordDisplay');
+const wpmSlider     = document.getElementById('wpmSlider');
+const wpmDisplay    = document.getElementById('wpmDisplay');
+const btnPlay       = document.getElementById('btnPlay');
+const btnPause      = document.getElementById('btnPause');
+const btnRestart    = document.getElementById('btnRestart');
+const btnClear      = document.getElementById('btnClear');
+const statusBar     = document.getElementById('statusBar');
+const statusDot     = document.getElementById('statusDot');
+const statusLabel   = document.getElementById('statusLabel');
+const progressLabel = document.getElementById('progressLabel');
+const progressFill  = document.getElementById('progressFill');
+const etaLabel      = document.getElementById('etaLabel');
+const contextStrip  = document.getElementById('contextStrip');
+const readerDisplay = document.getElementById('readerDisplay');
+const statsRow      = document.getElementById('statsRow');
+const focalGuide    = document.getElementById('focalGuide');
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  ORP ALGORITHM — Optimal Recognition Point
+ *
+ *  Research shows each word has a single fixation point where the brain
+ *  can decode the whole word most efficiently. This position shifts right
+ *  as words get longer (peripheral vision covers more letters).
+ *
+ *  Breakpoints derived from Spritz patent US20140270580 and follow-up
+ *  eye-tracking research on saccade reduction.
+ *
+ *  @param  {string} word  — raw word token (may include punctuation)
+ *  @return {number}       — 0-based index of focal letter in alpha chars
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+function getFocalIndex(word) {
+  // Strip punctuation to measure semantic word length only.
+  // "running," → "running" (len 7) so focal = position 2, not 3.
+  const clean = word.replace(/[^a-zA-Z0-9]/g, '');
+  const len = clean.length;
+
+  if (len <= 1)  return 0;
+  if (len <= 5)  return 1;
+  if (len <= 9)  return 2;
+  if (len <= 13) return 3;
+  return 4;
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  WORD RENDERER
+ *
+ *  Builds the word as individual letter <span>s, with the focal letter
+ *  getting class="focal". One innerHTML write per word.
+ *
+ *  Also:
+ *  - Triggers the CSS flash animation via the reflow trick
+ *  - Positions the vertical focal-guide line via getBoundingClientRect
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+function renderWord(word) {
+  if (!word) return;
+
+  const focalIdx = getFocalIndex(word);
+
+  /*
+   * Map the nth alpha character to its raw string position.
+   * Needed because words arrive with punctuation: "don't", "end."
+   * We want to highlight "o" in "don't" (position 1 of alpha chars),
+   * which sits at raw index 1 — but "." in "end." shouldn't count.
+   */
+  let alphaCount = -1;
+  let focalPos = 0;
+  for (let i = 0; i < word.length; i++) {
+    if (/[a-zA-Z0-9]/.test(word[i])) alphaCount++;
+    if (alphaCount === focalIdx) {
+      focalPos = i;
+      break;
+    }
+  }
+
+  // Build HTML string — single DOM write is faster than N insertions
+  let html = '';
+  for (let i = 0; i < word.length; i++) {
+    if (i === focalPos) {
+      html += `<span class="letter focal">${word[i]}</span>`;
+    } else {
+      html += `<span class="letter">${word[i]}</span>`;
+    }
+  }
+  wordDisplay.innerHTML = html;
+
+  /*
+   * Flash animation reflow trick:
+   * Removing a class and immediately re-adding it in the same JS task
+   * won't restart the animation — the browser batches style changes.
+   * Reading offsetWidth forces a synchronous layout flush, committing
+   * the class removal before we re-add it.
+   */
+  if (document.getElementById('optFlash').checked) {
+    wordDisplay.classList.remove('flash');
+    void wordDisplay.offsetWidth;   // Force reflow ← intentional
+    wordDisplay.classList.add('flash');
+  }
+
+  /*
+   * Position the vertical focal guide.
+   * Must run after the browser paints the new word, so we defer to rAF.
+   * Without rAF, getBoundingClientRect would return stale measurements.
+   */
+  requestAnimationFrame(() => {
+    const focal = wordDisplay.querySelector('.focal');
+    const stage = wordDisplay.parentElement;
+    if (focal && stage) {
+      const stageRect = stage.getBoundingClientRect();
+      const focalRect = focal.getBoundingClientRect();
+      const relX = focalRect.left - stageRect.left + focalRect.width / 2;
+      focalGuide.style.left = relX + 'px';
+    }
+  });
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  CONTEXT STRIP RENDERER
+ *
+ *  Shows ±8 words around the current word for spatial context.
+ *  Without this, RSVP feels disorienting — users lose their place.
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+function renderContext() {
+  if (!document.getElementById('optContext').checked) {
+    contextStrip.innerHTML = '';
+    return;
+  }
+  const range = 8;
+  const start = Math.max(0, idx - range);
+  const end   = Math.min(words.length - 1, idx + range);
+
+  let html = '';
+  for (let i = start; i <= end; i++) {
+    const cls = i === idx ? 'current' : i < idx ? 'prev' : '';
+    html += `<span class="context-word ${cls}">${words[i]}</span>`;
+  }
+  contextStrip.innerHTML = html;
+
+  // Scroll current word into view within the strip
+  const cur = contextStrip.querySelector('.current');
+  if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  PROGRESS UPDATER
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+function updateProgress() {
+  const pct = words.length ? (idx / words.length) * 100 : 0;
+  progressFill.style.width = pct + '%';
+  progressLabel.textContent = `${idx} / ${words.length}`;
+
+  // ETA: remaining words ÷ current WPM
+  const remaining = words.length - idx;
+  const mins = remaining / wpm;
+  etaLabel.textContent = mins < 1
+    ? Math.round(mins * 60) + 's'
+    : Math.round(mins) + 'm';
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  DELAY CALCULATOR
+ *
+ *  Returns ms to display the current word before advancing.
+ *  Base delay = 60,000ms / wpm (one word per interval).
+ *  Modifiers:
+ *    - Punctuation: words ending in .!?;:, get 1.8× longer display
+ *    - Length: each character over 8 adds 4% of base delay
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+function getDelay(word) {
+  const base = 60000 / wpm;
+
+  if (document.getElementById('optPausePunct').checked
+      && /[.!?;:,—–]$/.test(word)) {
+    return base * 1.8;
+  }
+
+  // Length bonus: long words deserve more time
+  const extra = Math.max(0, word.length - 8) * (base * 0.04);
+  return base + extra;
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  PLAYBACK SCHEDULER — the core loop
+ *
+ *  Uses recursive setTimeout (NOT setInterval) because:
+ *  - setInterval fires at a fixed rate regardless of callback duration
+ *  - Recursive setTimeout schedules the next call AFTER the current
+ *    one completes — self-correcting, never stacks up
+ *
+ *  Pattern: render current word → schedule showWord() → increment idx
+ *           The increment happens BEFORE scheduling so that if the user
+ *           pauses mid-flight, idx correctly points to the next unshown word.
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+function showWord() {
+  if (idx >= words.length) {
+    // Reached the end — clean up
+    stopPlayback();
+    setStatus('✓ Finished reading.', 'success');
+    statusDot.className = 'status-dot';
+    statusLabel.textContent = 'Complete';
+    return;
+  }
+
+  const word = words[idx];
+  renderWord(word);
+  renderContext();
+  updateProgress();
+
+  const delay = getDelay(word);
+  idx++;  // Advance read head (before scheduling, so pause lands correctly)
+  timer = setTimeout(showWord, delay);
+}
+
+function startPlayback() {
+  if (!words.length) return;
+  playing = true;
+  readerDisplay.classList.add('active');
+  statusDot.className = 'status-dot playing';
+  statusLabel.textContent = 'Playing';
+  btnPlay.disabled  = true;
+  btnPause.disabled = false;
+  btnRestart.disabled = false;
+  showWord();
+}
+
+function stopPlayback() {
+  playing = false;
+  clearTimeout(timer);  // Cancel the pending setTimeout
+  readerDisplay.classList.remove('active');
+  statusDot.className   = 'status-dot';
+  statusLabel.textContent = 'Paused';
+  btnPlay.disabled  = false;
+  btnPause.disabled = true;
+}
+
+function setStatus(msg, type = '') {
+  statusBar.textContent = msg;
+  statusBar.className = 'status-bar' + (type ? ' ' + type : '');
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  TEXT LOADER
+ *
+ *  Receives raw string from any file parser or textarea.
+ *  Normalizes whitespace, tokenizes, populates words[], resets state.
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+function loadText(text) {
+  // Collapse all whitespace (newlines, tabs, multiple spaces) → single space
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+
+  // Tokenize and strip empty strings (can appear from leading/trailing spaces)
+  words = cleaned.split(' ').filter(w => w.length > 0);
+  idx   = 0;
+  playing = false;
+  clearTimeout(timer);
+
+  if (!words.length) {
+    setStatus('No words found in the document.', 'error');
+    return;
+  }
+
+  // Unlock controls
+  btnPlay.disabled    = false;
+  btnRestart.disabled = false;
+  statsRow.style.display = 'flex';
+
+  // Populate stats
+  document.getElementById('wordCountStat').textContent = words.length.toLocaleString();
+  document.getElementById('charCountStat').textContent = cleaned.length.toLocaleString();
+  const estMins = Math.round(words.length / wpm);
+  document.getElementById('estTimeStat').textContent = estMins < 1 ? '<1m' : estMins + 'm';
+
+  // Preview first word without starting playback
+  renderWord(words[0]);
+  renderContext();
+  updateProgress();
+  statusDot.className     = 'status-dot';
+  statusLabel.textContent = 'Ready';
+  setStatus(`✓ Loaded ${words.length.toLocaleString()} words — press Play or Space to start.`, 'success');
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  FILE PARSING PIPELINE
+ *
+ *  Routes by file extension to the appropriate parser.
+ *  All parsers are async and resolve to a plain text string,
+ *  which is then passed to loadText().
+ *
+ *  PDF:  PDF.js → iterate pages → extract text content items
+ *  DOCX: Mammoth.js → extractRawText (strips all OOXML markup)
+ *  TXT:  Native File.text() API
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+async function handleFile(file) {
+  setStatus(`Loading ${file.name}…`);
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  try {
+    if (ext === 'pdf') {
+      /*
+       * PDF.js operates on an ArrayBuffer. It returns a document object
+       * whose pages each have a getTextContent() method returning text
+       * "items" — individual positioned spans of text. Joining with
+       * spaces handles PDFs where words are stored as individual glyphs.
+       */
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const tc   = await page.getTextContent();
+        text += tc.items.map(s => s.str).join(' ') + ' ';
+      }
+      loadText(text);
+
+    } else if (ext === 'docx' || ext === 'doc') {
+      /*
+       * Mammoth converts DOCX to plain text, stripping all styles,
+       * images, tables, and OOXML markup. extractRawText is faster
+       * than the HTML conversion path and sufficient for word extraction.
+       */
+      const buf    = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer: buf });
+      loadText(result.value);
+
+    } else if (['txt', 'md', 'rtf', 'csv'].includes(ext)) {
+      // Plaintext: native browser File API, no library needed
+      const text = await file.text();
+      loadText(text);
+
+    } else {
+      setStatus('Unsupported file type. Please use PDF, DOCX, TXT, or MD.', 'error');
+    }
+  } catch (e) {
+    setStatus('Error reading file: ' + e.message, 'error');
+    console.error('File parse error:', e);
+  }
+}
+
+/*
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ *  EVENT LISTENERS
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+
+// --- File input (click to browse) ---
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+// --- Drag and drop ---
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();  // Required to allow drop
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+// --- Textarea live input: only trigger load after meaningful content ---
+textInput.addEventListener('input', () => {
+  const v = textInput.value.trim();
+  if (v.length > 10) loadText(v);  // Threshold avoids loading single words mid-type
+});
+
+// --- WPM slider ---
+wpmSlider.addEventListener('input', () => {
+  wpm = parseInt(wpmSlider.value);
+  wpmDisplay.textContent = wpm;
+
+  // Update estimated time display
+  if (words.length) {
+    const mins = Math.round(words.length / wpm);
+    document.getElementById('estTimeStat').textContent = mins < 1 ? '<1m' : mins + 'm';
+    const remaining = words.length - idx;
+    const r = remaining / wpm;
+    etaLabel.textContent = r < 1 ? Math.round(r * 60) + 's' : Math.round(r) + 'm';
+  }
+
+  /*
+   * Hot WPM update during playback:
+   * Cancel the in-flight timeout and reschedule at the new rate.
+   * The word currently on screen stays for the remaining old-rate time
+   * (imperceptible), then new rate takes over immediately.
+   */
+  if (playing) {
+    clearTimeout(timer);
+    timer = setTimeout(showWord, 60000 / wpm);
+  }
+});
+
+// --- Playback buttons ---
+btnPlay.addEventListener('click', startPlayback);
+
+btnPause.addEventListener('click', () => {
+  stopPlayback();
+  statusLabel.textContent = 'Paused';
+});
+
+btnRestart.addEventListener('click', () => {
+  stopPlayback();
+  idx = 0;
+  updateProgress();
+  if (words.length) {
+    renderWord(words[0]);
+    renderContext();
+  }
+  statusLabel.textContent = 'Ready';
+  btnPlay.disabled = false;
+});
+
+btnClear.addEventListener('click', () => {
+  stopPlayback();
+  words = [];
+  idx   = 0;
+  textInput.value = '';
+  fileInput.value = '';
+  wordDisplay.innerHTML = '<span class="idle-text">Press <strong>Play</strong> to begin</span>';
+  contextStrip.innerHTML = '';
+  progressFill.style.width  = '0%';
+  progressLabel.textContent = '0 / 0';
+  etaLabel.textContent      = '—';
+  statsRow.style.display    = 'none';
+  btnPlay.disabled    = true;
+  btnPause.disabled   = true;
+  btnRestart.disabled = true;
+  statusDot.className     = 'status-dot';
+  statusLabel.textContent = 'Idle';
+  setStatus('Ready — load a file or paste text to begin.');
+});
+
+/*
+ * --- Keyboard shortcuts ---
+ *
+ * Guard: if the user is typing in a textarea or input, don't intercept
+ * keystrokes. Without this, Space in the textarea would both insert a
+ * space AND toggle playback.
+ */
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement.tagName;
+  if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+
+  if (e.code === 'Space') {
+    e.preventDefault();  // Prevent page scroll
+    if (playing) {
+      stopPlayback();
+      statusLabel.textContent = 'Paused';
+    } else if (words.length) {
+      startPlayback();
+    }
+  }
+
+  // Step through words one at a time while paused
+  if (e.code === 'ArrowRight' && !playing && words.length) {
+    idx = Math.min(idx + 1, words.length - 1);
+    renderWord(words[idx]);
+    renderContext();
+    updateProgress();
+  }
+  if (e.code === 'ArrowLeft' && !playing && words.length) {
+    idx = Math.max(idx - 1, 0);
+    renderWord(words[idx]);
+    renderContext();
+    updateProgress();
+  }
+
+  // Adjust speed in 50 WPM increments
+  if (e.code === 'ArrowUp') {
+    wpmSlider.value = Math.min(1000, wpm + 50);
+    wpmSlider.dispatchEvent(new Event('input'));
+  }
+  if (e.code === 'ArrowDown') {
+    wpmSlider.value = Math.max(60, wpm - 50);
+    wpmSlider.dispatchEvent(new Event('input'));
+  }
+});
+
+// Re-render context strip when toggle changes
+document.getElementById('optContext').addEventListener('change', renderContext);
+</script>
+</body>
+</html>
