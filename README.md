@@ -2,7 +2,7 @@
 
 > **Rapid Serial Visual Presentation** — A browser-based speed reading tool that uses the Optimal Recognition Point (ORP) algorithm to train your eyes to read faster with better comprehension.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-brightgreen?style=flat-square)](https://your-username.github.io/rsvp-speed-reader)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-brightgreen?style=flat-square)](https://LSaiko.github.io/rsvp-speed-reader)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 [![Vanilla JS](https://img.shields.io/badge/Built%20With-Vanilla%20JS-f7df1e?style=flat-square&logo=javascript)](speed-reader.html)
 [![No Dependencies](https://img.shields.io/badge/Runtime%20Dependencies-0-blue?style=flat-square)](#)
@@ -39,7 +39,7 @@
 
 ```bash
 # Option 1: Clone the repo
-git clone https://github.com/your-username/rsvp-speed-reader.git
+git clone https://github.com/LSaiko/rsvp-speed-reader.git
 cd rsvp-speed-reader
 open speed-reader.html   # macOS
 start speed-reader.html  # Windows
@@ -49,7 +49,7 @@ xdg-open speed-reader.html  # Linux
 # Click "speed-reader.html" above → Download Raw
 ```
 
-Or use the [Live Demo →](https://your-username.github.io/rsvp-speed-reader)
+Or use the [Live Demo →](https://LSaiko.github.io/rsvp-speed-reader)
 
 ---
 

@@ -445,7 +445,7 @@
 
   <!-- File upload: hidden <input> triggered by clicking the visible zone div -->
   <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-    <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt,.md,.rtf">
+    <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt,.md">
     <span class="upload-icon">📄</span>
     <p><strong>Drop a file here</strong> or click to browse</p>
     <div class="file-types">
@@ -633,13 +633,21 @@ const focalGuide    = document.getElementById('focalGuide');
  *  @return {number}       — 0-based index of focal letter in alpha chars
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function getFocalIndex(word) {
   // Strip punctuation to measure semantic word length only.
   // "running," → "running" (len 7) so focal = position 2, not 3.
   const clean = word.replace(/[^a-zA-Z0-9]/g, '');
   const len = clean.length;
 
-  if (len <= 1)  return 0;
+  if (len <= 2)  return 0;
   if (len <= 5)  return 1;
   if (len <= 9)  return 2;
   if (len <= 13) return 3;
@@ -683,9 +691,9 @@ function renderWord(word) {
   let html = '';
   for (let i = 0; i < word.length; i++) {
     if (i === focalPos) {
-      html += `<span class="letter focal">${word[i]}</span>`;
+      html += `<span class="letter focal">${escapeHtml(word[i])}</span>`;
     } else {
-      html += `<span class="letter">${word[i]}</span>`;
+      html += `<span class="letter">${escapeHtml(word[i])}</span>`;
     }
   }
   wordDisplay.innerHTML = html;
@@ -740,7 +748,7 @@ function renderContext() {
   let html = '';
   for (let i = start; i <= end; i++) {
     const cls = i === idx ? 'current' : i < idx ? 'prev' : '';
-    html += `<span class="context-word ${cls}">${words[i]}</span>`;
+    html += `<span class="context-word ${cls}">${escapeHtml(words[i])}</span>`;
   }
   contextStrip.innerHTML = html;
 
@@ -940,7 +948,7 @@ async function handleFile(file) {
       const result = await mammoth.extractRawText({ arrayBuffer: buf });
       loadText(result.value);
 
-    } else if (['txt', 'md', 'rtf', 'csv'].includes(ext)) {
+    } else if (['txt', 'md', 'csv'].includes(ext)) {
       // Plaintext: native browser File API, no library needed
       const text = await file.text();
       loadText(text);

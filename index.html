@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   RSVP Speed Reader — Portfolio Showcase Page
-  Hosted at: https://your-username.github.io/rsvp-speed-reader
+  Hosted at: https://LSaiko.github.io/rsvp-speed-reader
   This page is the "cover" for the GitHub repo. Hiring managers land here.
 -->
 <html lang="en">
@@ -570,7 +570,7 @@
       <li><a href="#skills">Skills</a></li>
       <li><a href="#code">Code</a></li>
       <li><a href="#download">Download</a></li>
-      <li><a href="https://github.com/your-username/rsvp-speed-reader" target="_blank">GitHub ↗</a></li>
+      <li><a href="https://github.com/LSaiko/rsvp-speed-reader" target="_blank">GitHub ↗</a></li>
     </ul>
   </nav>
 
@@ -584,7 +584,7 @@
       </p>
       <div class="hero-cta">
         <a href="speed-reader.html" class="btn btn-primary">▶ Open App</a>
-        <a href="https://github.com/your-username/rsvp-speed-reader" class="btn btn-secondary" target="_blank">View on GitHub ↗</a>
+        <a href="https://github.com/LSaiko/rsvp-speed-reader" class="btn btn-secondary" target="_blank">View on GitHub ↗</a>
       </div>
     </div>
 
@@ -943,7 +943,7 @@ wordDisplay.classList.<span class="token-fn">add</span>(<span class="token-strin
         <div class="download-desc">Annotated deep-dive into every engineering decision with code excerpts and trade-off analysis.</div>
         <div class="download-size">Markdown · ~12 KB</div>
       </a>
-      <a href="https://github.com/your-username/rsvp-speed-reader/archive/refs/heads/main.zip" class="download-card" target="_blank">
+      <a href="https://github.com/LSaiko/rsvp-speed-reader/archive/refs/heads/main.zip" class="download-card" target="_blank">
         <div class="download-icon">📦</div>
         <div class="download-title">Full Repository</div>
         <div class="download-desc">Clone or download the complete repo including GitHub Actions deploy workflow.</div>
@@ -954,7 +954,7 @@ wordDisplay.classList.<span class="token-fn">add</span>(<span class="token-strin
 
   <!-- ── FOOTER ─────────────────────────────────────────────────── -->
   <footer>
-    <p>RSVP Speed Reader · MIT License · <a href="https://github.com/your-username/rsvp-speed-reader" target="_blank">github.com/your-username/rsvp-speed-reader</a></p>
+    <p>RSVP Speed Reader · MIT License · <a href="https://github.com/LSaiko/rsvp-speed-reader" target="_blank">github.com/LSaiko/rsvp-speed-reader</a></p>
     <p>Built with Vanilla JS · PDF.js · Mammoth.js</p>
   </footer>
 
@@ -1016,7 +1016,7 @@ wordDisplay.classList.<span class="token-fn">add</span>(<span class="token-strin
       const current = 142 + (demoIdx * 7);
       demoProgressEl.textContent = `${Math.min(current, total).toLocaleString()} / ${total.toLocaleString()}`;
 
-      demoIdx++;
+      demoIdx = (demoIdx + 1) % (demoWords.length * ctxWords.length);
       setTimeout(animateDemoWord, 400);
     }
     animateDemoWord();
